@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpendSmart</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #181818;
+      --border: #2a2a2a;
+      --text: #e8e8e8;
+      --muted: #666;
+      --accent: #c8f542;
+      --red: #ff5f5f;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    /* ── layout ── */
+    .app { max-width: 680px; margin: 0 auto; }
+
+    header { margin-bottom: 40px; }
+    header h1 { font-family: var(--mono); font-size: 22px; color: var(--accent); letter-spacing: -0.5px; }
+    header p  { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* ── tabs ── */
+    .tabs { display: flex; gap: 2px; margin-bottom: 28px; }
+    .tab {
+      flex: 1; padding: 10px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 4px;
+      color: var(--muted); font-size: 13px; font-family: var(--mono);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .tab:hover { color: var(--text); border-color: #444; }
+    .tab.active { background: var(--accent); color: #0f0f0f; border-color: var(--accent); font-weight: 500; }
+
+    /* ── panels ── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── form ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid .full { grid-column: 1 / -1; }
+
+    label { display: block; font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    input, select, textarea {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 12px; border-radius: 4px;
+      font-size: 14px; font-family: var(--sans); outline: none; transition: border 0.15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    select option { background: var(--surface); }
+    textarea { resize: vertical; min-height: 72px; }
+
+    .btn {
+      padding: 10px 20px; background: var(--accent); color: #0f0f0f;
+      border: none; border-radius: 4px; font-size: 13px; font-family: var(--mono);
+      font-weight: 500; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-family: var(--mono);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+
+    /* ── toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 12px 18px; border-radius: 6px; font-size: 13px;
+      font-family: var(--mono); opacity: 0; transform: translateY(8px);
+      transition: all 0.2s; pointer-events: none; z-index: 99;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok   { border-color: var(--accent); color: var(--accent); }
+    .toast.err  { border-color: var(--red);    color: var(--red); }
+
+    /* ── transactions list ── */
+    .txn-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px;
+    }
+    .txn-header span { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+    .txn-item {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .txn-item:last-child { border-bottom: none; }
+
+    .txn-left .txn-category { font-size: 14px; font-weight: 500; }
+    .txn-left .txn-note     { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .txn-left .txn-date     { font-size: 11px; color: #555; font-family: var(--mono); margin-top: 3px; }
+
+    .txn-right { text-align: right; }
+    .txn-amount { font-size: 15px; font-family: var(--mono); font-weight: 500; }
+    .txn-amount.income  { color: var(--accent); }
+    .txn-amount.expense { color: var(--red); }
+    .txn-type { font-size: 10px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; margin-top: 3px; }
+
+    .empty { text-align: center; padding: 48px 0; color: var(--muted); font-size: 13px; font-family: var(--mono); }
+
+    /* ── predict ── */
+    .predict-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 24px; margin-bottom: 20px;
+    }
+    .predict-box h2 { font-size: 13px; font-family: var(--mono); color: var(--muted); margin-bottom: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .result-card {
+      background: var(--bg); border: 1px solid var(--accent);
+      border-radius: 6px; padding: 24px; text-align: center; margin-top: 20px;
+    }
+    .result-label { font-size: 11px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; }
+    .result-value { font-size: 42px; font-family: var(--mono); color: var(--accent); margin-top: 8px; }
+    .result-sub   { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <header>
+    <h1>SpendSmart_</h1>
+    <p>expense tracker · prediction engine</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('add')">+ Add</button>
+    <button class="tab"        onclick="switchTab('txns')">Transactions</button>
+    <button class="tab"        onclick="switchTab('predict')">Predict</button>
+  </div>
+
+  <!-- ── ADD EXPENSE ── -->
+  <div class="panel active" id="panel-add">
+    <div class="form-grid">
+
+      <div>
+        <label>Amount (₹)</label>
+        <input type="number" id="amount" placeholder="0.00" min="0" step="0.01" />
+      </div>
+
+      <div>
+        <label>Date</label>
+        <input type="date" id="date" />
+      </div>
+
+      <div>
+        <label>Type</label>
+        <select id="type">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Category</label>
+        <select id="category">
+          <option>Food</option>
+          <option>Transport</option>
+          <option>Rent/Hostel</option>
+          <option>Allowance</option>
+          <option>Stipend</option>
+          <option>Entertainment</option>
+          <option>Education</option>
+          <option>Health</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="full">
+        <label>Notes (optional)</label>
+        <textarea id="notes" placeholder="Quick note about this transaction…"></textarea>
+      </div>
+
+      <div class="full" style="display:flex; gap:10px;">
+        <button class="btn" id="addBtn" onclick="addTransaction()">Add Transaction</button>
+        <button class="btn btn-outline" onclick="clearForm()">Clear</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── TRANSACTIONS ── -->
+  <div class="panel" id="panel-txns">
+    <div class="txn-header">
+      <span id="txn-count">— transactions</span>
+      <button class="btn btn-outline" onclick="loadTransactions()">↻ Refresh</button>
+    </div>
+    <div id="txn-list"><div class="empty">Loading…</div></div>
+  </div>
+
+  <!-- ── PREDICT ── -->
+  <div class="panel" id="panel-predict">
+    <div class="predict-box">
+      <h2>Next Month Estimate</h2>
+      <div class="form-grid">
+        <div>
+          <label>Reference Date</label>
+          <input type="date" id="pred-date" />
+        </div>
+        <div>
+          <label>Avg Daily Spend (₹)</label>
+          <input type="number" id="pred-amount" placeholder="e.g. 350" min="0" />
+        </div>
+        <div class="full">
+          <button class="btn" id="predBtn" onclick="getPrediction()">Run Prediction</button>
+        </div>
+      </div>
+    </div>
+    <div id="pred-result"></div>
+  </div>
+
+</div>
+
+<!-- toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = 'http://127.0.0.1:8000';
+
+  // set today as default dates
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date').value = today;
+  document.getElementById('pred-date').value = today;
+
+  // ── tab switching ──
+  function switchTab(name) {
+    
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      t.classList.toggle('active', ['add', 'txns', 'predict'][i] === name);
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'txns') loadTransactions();
+  }
+
+  // ── toast helper ──
+  function toast(msg, type = 'ok') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show ' + type;
+    setTimeout(() => el.className = 'toast', 2500);
+  }
+
+  // ── add transaction ──
+  async function addTransaction() {
+    const amount   = document.getElementById('amount').value;
+    const date     = document.getElementById('date').value;
+    const type     = document.getElementById('type').value;
+    const category = document.getElementById('category').value;
+    const notes    = document.getElementById('notes').value;
+
+    if (!amount || !date) { toast('Amount and date are required', 'err'); return; }
+
+    const btn = document.getElementById('addBtn');
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+
+    try {
+      const res = await fetch(API + '/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: parseFloat(amount), type, category, Date: date, notes: notes || null })
+      });
+      if (!res.ok) throw new Error('Server error');
+      toast('Transaction added ✓');
+      clearForm();
+    } catch (e) {
+      toast('Failed to add — is the server running?', 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add Transaction';
+    }
+  }
+
+  function clearForm() {
+    document.getElementById('amount').value = '';
+    document.getElementById('date').value = today;
+    document.getElementById('notes').value = '';
+    document.getElementById('type').value = 'expense';
+    document.getElementById('category').value = 'Food';
+  }
+
+  // ── load transactions ──
+  async function loadTransactions() {
+    const list = document.getElementById('txn-list');
+    list.innerHTML = '<div class="empty">Loading…</div>';
+
+    try {
+      const res  = await fetch(API + '/transactions/view');
+      const data = await res.json();
+
+      document.getElementById('txn-count').textContent = data.length + ' transactions';
+
+      if (data.length === 0) {
+        list.innerHTML = '<div class="empty">No transactions yet.</div>';
+        return;
+      }
+
+      list.innerHTML = data.map(t => {
+        const isIncome = t.type === 'income';
+        const d = t.Date || t.date || '';
+        const note = t.notes ? `<div class="txn-note">${t.notes}</div>` : '';
+        return `
+          <div class="txn-item">
+            <div class="txn-left">
+              <div class="txn-category">${t.category}</div>
+              ${note}
+              <div class="txn-date">${d}</div>
+            </div>
+            <div class="txn-right">
+              <div class="txn-amount ${isIncome ? 'income' : 'expense'}">
+                ${isIncome ? '+' : '-'} ₹${parseFloat(t.amount).toLocaleString('en-IN')}
+              </div>
+              <div class="txn-type">${t.type}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+    } catch (e) {
+      list.innerHTML = '<div class="empty">Could not load — is the server running?</div>';
+    }
+  }
+
+  // ── prediction ──
+  async function getPrediction() {
+    const date   = document.getElementById('pred-date').value;
+    const amount = document.getElementById('pred-amount').value;
+
+    if (!date || !amount) { toast('Both fields are required', 'err'); return; }
+
+    const btn = document.getElementById('predBtn');
+    btn.disabled = true;
+    btn.textContent = 'Predicting…';
+
+    const resultDiv = document.getElementById('pred-result');
+    resultDiv.innerHTML = '';
+
+    try {
+      const res = await fetch(API + '/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: parseFloat(amount), type: 'expense', category: 'Other', Date: date })
+      });
+      if (!res.ok) throw new Error('Server error');
+      const value = await res.json();
+
+      resultDiv.innerHTML = `
+        <div class="result-card">
+          <div class="result-label">Predicted Next Month</div>
+          <div class="result-value">₹${parseFloat(value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+          <div class="result-sub">Estimated total spending for next month</div>
+        </div>`;
+    } catch (e) {
+      toast('Prediction failed — is the server running?', 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Run Prediction';
+    }
+  }
+</script>
+</body>
+</html>
